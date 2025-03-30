@@ -7,3 +7,5 @@ venv/
 # Ignore the large dataset file
 data/input/TMDB_movie_dataset_v11.csv
 data/output/tfidf_movies
+
+.DS_Store
