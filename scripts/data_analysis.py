@@ -11,9 +11,17 @@ from pyspark.sql.functions import (
     when,
     regexp_replace,
     stddev,
-    count,
+    lower,
+    concat_ws,
+    desc,
 )
-from pyspark.ml.feature import VectorAssembler
+from pyspark.ml.feature import (
+    VectorAssembler,
+    Tokenizer,
+    StopWordsRemover,
+    CountVectorizer,
+    IDF,
+)
 import matplotlib.pyplot as plt
 from pyspark.ml.stat import Correlation
 import pandas as pd
@@ -74,7 +82,7 @@ try:
     df = df.withColumn("release_year", col("release_year").cast("int"))
     df = df.withColumn("release_month", col("release_month").cast("int"))
 
-    # --- STEP1: Voting Distribution ---
+    # --- STEP 1: Voting Distribution ---
     df_clean = df.filter(col("vote_count") >= 100)
 
     df_clean.select("vote_average").groupBy("vote_average").count().orderBy(
@@ -121,10 +129,10 @@ try:
     plt.savefig(os.path.join(project_root, "data", "output", "rating_distribution.png"))
     plt.close()
 
-    # --- STEP2: Filter High Rating Movies (rating >= 7.0)---
+    # --- STEP 2: Filter High Rating Movies (rating >= 7.0) ---
     high_rating_df = df_grouped.filter(col("rating_group") >= 7.0)
 
-    # --- STEP3: Correlation Analysis---
+    # --- STEP 3: Correlation Analysis ---
     # Numerical columns
     numerical_cols = [
         "rating_group",
@@ -252,19 +260,71 @@ try:
     visualize_correlation_matrix(corr_array, valid_numerical_cols)
 
     spark.catalog.clearCache()
-    spark.stop()
+
+    # --- STEP 4: Analyzing Frequent Words ---
+    # Merge keywords and processed_text into one column
+    merged_text_df = high_rating_df.withColumn(
+        "merged_text", concat_ws(" ", col("keywords"), col("processed_text"))
+    )
+
+    # Clean text: Remove non-alphabetic characters and trim spaces
+    merged_text_df = (
+        merged_text_df.withColumn(
+            "cleaned_text",
+            regexp_replace(lower(col("merged_text")), "[^a-zA-Z\\s]", ""),
+        )
+        .withColumn(
+            "cleaned_text",
+            regexp_replace(col("cleaned_text"), "\\s+", " "),  # Remove extra spaces
+        )
+        .filter(col("cleaned_text") != "")
+    )  # Remove empty rows
+
+    # Tokenize text into words
+    tokenizer = Tokenizer(inputCol="cleaned_text", outputCol="words")
+    words_data = tokenizer.transform(merged_text_df)
+
+    # Remove stop words (common words like "the", "a", "on")
+    stopwords_remover = StopWordsRemover(inputCol="words", outputCol="filtered_words")
+    filtered_data = stopwords_remover.transform(words_data)
+
+    # Convert words into feature vectors using CountVectorizer
+    cv = CountVectorizer(
+        inputCol="filtered_words", outputCol="raw_features", vocabSize=500
+    )
+    cv_model = cv.fit(filtered_data)
+    featurized_data = cv_model.transform(filtered_data)
+
+    # Apply TF-IDF transformation
+    idf = IDF(inputCol="raw_features", outputCol="tfidf_features")
+    idf_model = idf.fit(featurized_data)
+    tfidf_data = idf_model.transform(featurized_data)
+
+    # Extract words with highest TF-IDF scores
+    vocab = cv_model.vocabulary
+    tfidf_scores = tfidf_data.select(explode(col("filtered_words")).alias("word"))
+
+    # Count word frequencies
+    word_counts = tfidf_scores.groupBy("word").count().orderBy(desc("count"))
+
+    # Filter only words in the vocabulary
+    word_counts_filtered = word_counts.filter(col("word").isin(vocab))
+
+    # Convert to Pandas and save as CSV
+    word_counts_pd = word_counts_filtered.toPandas()
+    output_path = os.path.join(
+        project_root, "data", "output", "tfidf_frequent_words.csv"
+    )
+    word_counts_pd.to_csv(output_path, index=False)
+
 
 except Exception as e:
     print(f"An error occurred: {e}")
     spark.stop()
 
+finally:
+    spark.stop()
 
-# # STEP4
-# for col_name in ["keywords", "overview", "tagline", "processed_text"]:
-#     tokens = df.select(explode(split(lower(col(col_name)), "\\W+")).alias("token"))
-#     tokens.filter(col("token") != "").groupBy("token").count().orderBy(
-#         desc("count")
-#     ).show(10)
 
 # # STEP5
 
@@ -366,6 +426,3 @@ except Exception as e:
 # kmeans = KMeans(k=5, featuresCol="features", predictionCol="cluster")
 # model = kmeans.fit(high_rating_feat_df)
 # clustered = model.transform(high_rating_feat_df)
-
-
-spark.stop()
