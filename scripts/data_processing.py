@@ -10,28 +10,31 @@ nltk.data.path.append("../data/input/nltk_data")
 from nltk.corpus import stopwords
 
 df = pd.read_csv("../data/input/TMDB_movie_dataset_v11.csv")
-# print(df.columns)
+non_null_counts = df.count()  # Counts non-null values
+null_counts = df.isnull().sum()  # Counts null values
 
-### Columns required - title, vote_average, vote_count, status, revenue, runtime, adult, backdrop_path, poster_path, budget, original_language, overview, popularity, genres,tagline, production_companies, production_countries, spoken_languages, release_date, spoken_languages, spoken_languages, spoken_languages, keywords
+result = pd.DataFrame({"Non-null Count": non_null_counts, "Null Count": null_counts})
+print(result)
+
+# # for col in df.columns:
+# #     print(f"Column: {col}")
+# #     print(df[col].value_counts(), "\n")
+
+### Columns required - title, vote_average, vote_count, revenue, runtime, poster_path, budget, original_language, overview, popularity, release_date
 # Drop rows with the above columns = null
 df = df.dropna(subset=[
-    "title", "vote_average", "vote_count", "status", "revenue", "runtime", "adult",
-    "backdrop_path", "poster_path", "budget", "original_language", "overview", "popularity", 
-    "genres", "tagline", "production_companies", "production_countries", "spoken_languages", 
-    "release_date", "keywords"
+    "title", "vote_average", "vote_count", "revenue", "runtime", "poster_path", "budget", "original_language", "overview", "popularity",
+    "release_date"
 ])
-# Drop rows with duplicated title, release_date, status
-df = df.drop_duplicates(subset=['title', 'release_date', 'status'], keep='first')
+
+# Drop rows with duplicated title, release_date
+df = df.drop_duplicates(subset=['title', 'release_date'], keep='first')
 # print(df.isnull().sum())
 
 ### Update poster_path and backdrop_path with url
 base_url = "https://image.tmdb.org/t/p/w780" #width 780 standardised
 df["poster_path"] = base_url + df["poster_path"]
-df["backdrop_path"] = base_url + df["backdrop_path"]
-
-# for col in df.columns:
-#     print(f"Column: {col}")
-#     print(df[col].value_counts(), "\n")
+# df["backdrop_path"] = base_url + df["backdrop_path"]
 
 ### Convert release_date to year, month, day columns
 df["release_date"] = pd.to_datetime(df["release_date"], errors="coerce")
@@ -39,16 +42,17 @@ df["release_year"] = df["release_date"].dt.year
 df["release_month"] = df["release_date"].dt.month
 df["release_day"] = df["release_date"].dt.day
 
+
 ### Text preprocessing
 # Combine overview and tagline columns into a single text column
-df["text"] = df["overview"] + " " + df["tagline"]
+df["text"] = df["overview"] + " " + df["tagline"].fillna("") + " " + df["keywords"].fillna("")
 
 # Define stopwords (you can extend this list as needed)
 stop_words = set(stopwords.words("english"))
 
 # Function for cleaning and removing stop words and non-sensible words
 def preprocess_text(text):
-    words = text.split()
+    words = re.split(r'[,\s]+', text)
     processed_words = []
 
     for word in words:
@@ -88,12 +92,6 @@ def preprocess_text(text):
 # Apply the text preprocessing
 df["processed_text"] = df["text"].apply(preprocess_text)
 
-# Vectorize using TF-IDF
-vectorizer = TfidfVectorizer(stop_words="english")
-tfidf_matrix = vectorizer.fit_transform(df["processed_text"])
-
-# Convert the TF-IDF matrix to DataFrame
-tfidf_df = pd.DataFrame(tfidf_matrix.toarray(), columns=vectorizer.get_feature_names_out())
 
 ### Export to csv
 # Function to split and save CSV
@@ -120,5 +118,20 @@ def split_and_save_csv(df, filename, chunk_size=10000):
         
 split_and_save_csv(df, "../data/output/processed_movies.csv")
 print("end")
+
+non_null_counts = df.count()  # Counts non-null values
+null_counts = df.isnull().sum()  # Counts null values
+
+result = pd.DataFrame({"Non-null Count": non_null_counts, "Null Count": null_counts})
+print(result)
+
+
+
+# Vectorize using TF-IDF
+# vectorizer = TfidfVectorizer(stop_words="english")
+# tfidf_matrix = vectorizer.fit_transform(df["processed_text"])
+
+# # Convert the TF-IDF matrix to DataFrame
+# tfidf_df = pd.DataFrame(tfidf_matrix.toarray(), columns=vectorizer.get_feature_names_out())
 # split_and_save_csv(tfidf_df, "../data/output/tfidf_movies.csv")
 # print('end 2')
