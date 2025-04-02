@@ -7,10 +7,6 @@ venv/
 # Ignore the large dataset file
 data/input/TMDB_movie_dataset_v11.csv
 data/output/tfidf_movies
-<<<<<<< HEAD
 
 .DS_Store
-=======
 data/output/processed_movies/v1
->>>>>>> 1e27506 (Updated processed movie datasets and preprocessing script)
-.DS_Store
