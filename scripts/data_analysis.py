@@ -251,28 +251,30 @@ try:
         # Enhanced correlation reporting
         print("\nSignificant Correlations:")
 
-    correlation_thresholds = {
-        "Strong Positive": (0.7, 1.0),
-        "Moderate Positive": (0.5, 0.7),
-        "Weak Positive": (0.3, 0.5),
-        "Strong Negative": (-1.0, -0.7),
-        "Moderate Negative": (-0.7, -0.5),
-        "Weak Negative": (-0.5, -0.3),
-    }
+        correlation_thresholds = {
+            "Strong Positive": (0.7, 1.0),
+            "Moderate Positive": (0.5, 0.7),
+            "Weak Positive": (0.3, 0.5),
+            "Strong Negative": (-1.0, -0.7),
+            "Moderate Negative": (-0.7, -0.5),
+            "Weak Negative": (-0.5, -0.3),
+        }
 
-    for correlation_type, (lower, upper) in correlation_thresholds.items():
-        print(f"\n{correlation_type} Correlations:")
-        found_correlations = False
-        for i in range(len(feature_names)):
-            for j in range(i + 1, len(feature_names)):
-                corr_value = corr_df.iloc[i, j]
-                if lower <= corr_value < upper or lower < -corr_value <= upper:
-                    print(f"{feature_names[i]} - {feature_names[j]}: {corr_value:.3f}")
-                    found_correlations = True
-                if not found_correlations:
-                    print("No correlations found in this range.")
+        for correlation_type, (lower, upper) in correlation_thresholds.items():
+            print(f"\n{correlation_type} Correlations:")
+            found_correlations = False
+            for i in range(len(feature_names)):
+                for j in range(i + 1, len(feature_names)):
+                    corr_value = corr_df.iloc[i, j]
+                    if lower <= corr_value < upper or lower < -corr_value <= upper:
+                        print(
+                            f"{feature_names[i]} - {feature_names[j]}: {corr_value:.3f}"
+                        )
+                        found_correlations = True
+                    if not found_correlations:
+                        print("No correlations found in this range.")
 
-            # Visualize correlation matrix
+    # Visualize correlation matrix
     visualize_correlation_matrix(corr_array, valid_numerical_cols)
 
     spark.catalog.clearCache()
