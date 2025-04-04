@@ -147,8 +147,8 @@ try:
 
     # --- STEP 2: Filter High Rating Movies (rating >= 7.0) ---
     high_rating_df = df_grouped.filter(col("rating_group") >= 7.0)
-    high_rating_df.filter(col("id") == "754").show()  # test
-    high_rating_df.filter(col("id") == "550").show()  # test
+    # high_rating_df.filter(col("id") == "754").show()  # test
+    # high_rating_df.filter(col("id") == "550").show()  # test
     # --- STEP 3: Correlation Analysis ---
     # Numerical columns
     numerical_cols = [
@@ -271,8 +271,8 @@ try:
                             f"{feature_names[i]} - {feature_names[j]}: {corr_value:.3f}"
                         )
                         found_correlations = True
-                    if not found_correlations:
-                        print("No correlations found in this range.")
+            if not found_correlations:
+                print("No correlations found in this range.")
 
     # Visualize correlation matrix
     visualize_correlation_matrix(corr_array, valid_numerical_cols)
@@ -574,5 +574,3 @@ except Exception as e:
 
 finally:
     spark.stop()
-
-# e.g., # temporary change
