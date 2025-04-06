@@ -393,7 +393,7 @@ try:
     df_features = pd.DataFrame(data, columns=columns)
 
     # Save as Parquet (for PySpark use)
-    df_features.to_parquet("movie_image_features.parquet", index=False)
+    df_features.to_parquet("data/output/movie_image_features.parquet", index=False)
 
     # (Optional) Also save as CSV
     # df_features.to_csv("movie_image_features.csv", index=False)
