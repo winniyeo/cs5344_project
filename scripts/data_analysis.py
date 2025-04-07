@@ -42,13 +42,7 @@ project_root = get_project_root()
 base_path = os.path.join(project_root, "data", "output", "processed_movies")
 
 # List of files
-file_list = [
-    "processed_movies_1.csv",
-    "processed_movies_2.csv",
-    "processed_movies_3.csv",
-    "processed_movies_4.csv",
-    "processed_movies_5.csv",
-]
+file_list = [f"processed_movies_{i}.csv" for i in range(1, 65)]
 
 # Construct full file paths
 full_file_paths = [os.path.join(base_path, filename) for filename in file_list]
@@ -83,7 +77,7 @@ try:
     df = df.withColumn("release_month", col("release_month").cast("int"))
 
     # --- STEP 1: Voting Distribution ---
-    df_clean = df.filter(col("vote_count") >= 100)
+    df_clean = df.filter(col("vote_count") >= 10)
 
     df_clean.select("vote_average").groupBy("vote_average").count().orderBy(
         "vote_average", ascending=False
@@ -143,34 +137,7 @@ try:
         "release_month",
     ]
 
-    # Convert adult to numeric
-    high_rating_df = high_rating_df.withColumn(
-        "adult_numeric", when(col("adult") == "TRUE", 1).otherwise(0)
-    )
-    numerical_cols.append("adult_numeric")
-
-    # Genre one-hot encoding
-    df_genre = high_rating_df.select("id", "genres")
-    df_genre = df_genre.withColumn("genre", explode(split(col("genres"), ",")))
-    df_genre = df_genre.withColumn("genre", trim(col("genre")))
-
-    # Filter popular genres
-    genre_counts = df_genre.groupBy("genre").count().filter(col("count") > 20)
-    popular_genres = [row["genre"] for row in genre_counts.collect()]
-    df_genre = df_genre.filter(col("genre").isin(popular_genres))
-
-    # Clean genre names
-    df_genre = df_genre.withColumn(
-        "genre_cleaned",
-        regexp_replace(trim(col("genre")), "[^a-zA-Z0-9]", "_"),
-    )
-
-    # One-hot encode genres
-    df_genre_ohe = df_genre.groupBy("id").pivot("genre_cleaned").count().fillna(0)
-
-    # Combine numerical data with genre one-hot encoding
-    df_numeric = high_rating_df.select(["id"] + numerical_cols)
-    df_merged = df_numeric.join(df_genre_ohe, on="id", how="left").fillna(0)
+    df_merged = high_rating_df.select(["id"] + numerical_cols)
 
     # Identify valid numerical columns (with non-zero standard deviation)
     other_cols = [c for c in df_merged.columns if c not in ["id"]]
