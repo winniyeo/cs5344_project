@@ -59,13 +59,7 @@ project_root = get_project_root()
 base_path = os.path.join(project_root, "data", "output", "processed_movies")
 
 # List of files
-file_list = [
-    "processed_movies_1.csv",
-    "processed_movies_2.csv",
-    "processed_movies_3.csv",
-    "processed_movies_4.csv",
-    "processed_movies_5.csv",
-]
+file_list = [f"processed_movies_{i}.csv" for i in range(1, 65)]
 
 # Construct full file paths
 full_file_paths = [os.path.join(base_path, filename) for filename in file_list]
@@ -103,7 +97,7 @@ try:
     df = df.withColumn("title", regexp_replace(col("title"), r'[\\/*?:"<>|]', ""))
 
     # --- STEP 1: Voting Distribution ---
-    df_clean = df.filter(col("vote_count") >= 100)
+    df_clean = df.filter(col("vote_count") >= 10)
 
     # Group vote_average into ranges from 1 to 10 using the floor(round down)
     df_grouped = df_clean.withColumn("rating_group", floor(col("vote_average")))
@@ -160,34 +154,7 @@ try:
         "release_month",
     ]
 
-    # Convert adult to numeric
-    high_rating_df = high_rating_df.withColumn(
-        "adult_numeric", when(col("adult") == "TRUE", 1).otherwise(0)
-    )
-    numerical_cols.append("adult_numeric")
-
-    # Genre one-hot encoding
-    df_genre = high_rating_df.select("id", "genres")
-    df_genre = df_genre.withColumn("genre", explode(split(col("genres"), ",")))
-    df_genre = df_genre.withColumn("genre", trim(col("genre")))
-
-    # Filter popular genres
-    genre_counts = df_genre.groupBy("genre").count().filter(col("count") > 20)
-    popular_genres = [row["genre"] for row in genre_counts.collect()]
-    df_genre = df_genre.filter(col("genre").isin(popular_genres))
-
-    # Clean genre names
-    df_genre = df_genre.withColumn(
-        "genre_cleaned",
-        regexp_replace(trim(col("genre")), "[^a-zA-Z0-9]", "_"),
-    )
-
-    # One-hot encode genres
-    df_genre_ohe = df_genre.groupBy("id").pivot("genre_cleaned").count().fillna(0)
-
-    # Combine numerical data with genre one-hot encoding
-    df_numeric = high_rating_df.select(["id"] + numerical_cols)
-    df_merged = df_numeric.join(df_genre_ohe, on="id", how="left").fillna(0)
+    df_merged = high_rating_df.select(["id"] + numerical_cols)
 
     # Identify valid numerical columns (with non-zero standard deviation)
     other_cols = [c for c in df_merged.columns if c not in ["id"]]
@@ -423,10 +390,12 @@ try:
 
     # Visualize KMeans clustering in 2D using PCA
     print("\n=== Visualizing Clusters with PCA ===")
-    feature_array = (
-        df_features_spark.select([f"feat_{i}" for i in range(2048)]).toPandas().values
+    sample_df = df_features_spark.select([f"feat_{i}" for i in range(2048)]).limit(1000)
+    # collect to Pandas
+    feature_array = sample_df.toPandas().values
+    cluster_labels = (
+        clustered_df.select("cluster").limit(1000).toPandas()["cluster"].values
     )
-    cluster_labels = clustered_df.select("cluster").toPandas()["cluster"].values
 
     # Downsizing to 2D
     pca = PCA(n_components=2)
@@ -449,7 +418,7 @@ try:
     plt.tight_layout()
     plt.show()
 
-    plt.savefig("cluster_plot.png")
+    plt.savefig(os.path.join(project_root, "data", "output", "cluster_plot.png"))
 
     # STEP 5.2.2: FrequentItems Analysis
     print("\n=== FrequentItems Analysis ===")
